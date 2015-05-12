@@ -72,7 +72,14 @@ fi
 prompt_color=33
 
 toolchain_version=20150406
-sdk_version=20150423
+case $host_platform_arch in
+  ios-arm64)
+    sdk_version=20150512
+    ;;
+  *)
+    sdk_version=20150423
+    ;;
+esac
 
 if [ -n "$FRIDA_ENV_NAME" ]; then
   frida_env_name_prefix=${FRIDA_ENV_NAME}-
@@ -180,6 +187,7 @@ case $host_platform in
     android_host_arch=$(echo ${host_arch} | sed 's,^i386$,x86,')
     case $android_host_arch in
       x86)
+        android_api=14
         android_host_abi=x86
         android_host_target=i686-none-linux-android
         android_host_toolchain=x86-4.8
@@ -188,6 +196,7 @@ case $host_platform in
         android_host_ldflags=""
         ;;
       x86_64)
+        android_api=21
         android_host_abi=x86_64
         android_host_target=x86_64-none-linux-android
         android_host_toolchain=x86_64-4.9
@@ -196,6 +205,7 @@ case $host_platform in
         android_host_ldflags=""
         ;;
       arm)
+        android_api=14
         android_host_abi=armeabi-v7a
         android_host_target=armv7-none-linux-androideabi
         android_host_toolchain=arm-linux-androideabi-4.8
@@ -204,18 +214,19 @@ case $host_platform in
         android_host_ldflags="-Wl,--fix-cortex-a8"
         ;;
       arm64)
+        android_api=21
         android_host_abi=arm64-v8a
         android_host_target=aarch64-none-linux-android
         android_host_toolchain=aarch64-linux-android-4.9
         android_host_toolprefix=aarch64-linux-android-
-        android_host_cflags="-march=arm64"
+        android_host_cflags=""
         android_host_ldflags=""
         ;;
     esac
 
-    android_clang_prefix="$ANDROID_NDK_ROOT/toolchains/llvm-3.4/prebuilt/${android_build_platform}-x86_64"
+    android_clang_prefix="$ANDROID_NDK_ROOT/toolchains/llvm-3.5/prebuilt/${android_build_platform}-x86_64"
     android_gcc_toolchain="$ANDROID_NDK_ROOT/toolchains/${android_host_toolchain}/prebuilt/${android_build_platform}-x86_64"
-    android_sysroot="$ANDROID_NDK_ROOT/platforms/android-14/arch-${android_host_arch}"
+    android_sysroot="$ANDROID_NDK_ROOT/platforms/android-${android_api}/arch-${android_host_arch}"
     toolflags="--sysroot=$android_sysroot \
 --gcc-toolchain=$android_gcc_toolchain \
 --target=$android_host_target \
@@ -339,7 +350,7 @@ VALAC="$VALAC --vapidir=\"$FRIDA_PREFIX/share/vala/vapi\""
 [ ! -d "$FRIDA_PREFIX/share/aclocal}" ] && mkdir -p "$FRIDA_PREFIX/share/aclocal"
 [ ! -d "$FRIDA_PREFIX/lib}" ] && mkdir -p "$FRIDA_PREFIX/lib"
 
-if [ ! -f "$FRIDA_TOOLROOT/.stamp" ]; then
+if ! grep -Eq "^$toolchain_version\$" "$FRIDA_TOOLROOT/.version" 2>/dev/null; then
   rm -rf "$FRIDA_TOOLROOT"
   mkdir -p "$FRIDA_TOOLROOT"
 
@@ -360,10 +371,10 @@ if [ ! -f "$FRIDA_TOOLROOT/.stamp" ]; then
       "$template" > "$target"
   done
 
-  touch "$FRIDA_TOOLROOT/.stamp"
+  echo $toolchain_version > "$FRIDA_TOOLROOT/.version"
 fi
 
-if [ "$FRIDA_ENV_SDK" != 'none' -a ! -f "$FRIDA_SDKROOT/.stamp" ]; then
+if [ "$FRIDA_ENV_SDK" != 'none' ] && ! grep -Eq "^$sdk_version\$" "$FRIDA_SDKROOT/.version" 2>/dev/null; then
   rm -rf "$FRIDA_SDKROOT"
   mkdir -p "$FRIDA_SDKROOT"
 
@@ -405,7 +416,7 @@ if [ "$FRIDA_ENV_SDK" != 'none' -a ! -f "$FRIDA_SDKROOT/.stamp" ]; then
     fi
   done
 
-  touch "$FRIDA_SDKROOT/.stamp"
+  echo $sdk_version > "$FRIDA_SDKROOT/.version"
 fi
 
 env_rc=build/${FRIDA_ENV_NAME:-frida}-env-${host_platform_arch}.rc
