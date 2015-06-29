@@ -37,7 +37,7 @@ if [ -z "$FRIDA_HOST" ]; then
 fi
 
 if [ $host_platform = "android" ]; then
-  ndk_required=r10d
+  ndk_required=r10e
   if [ -n "$ANDROID_NDK_ROOT" ]; then
     ndk_installed=$(cut -f1 -d" " "$ANDROID_NDK_ROOT/RELEASE.TXT")
     if [ "$ndk_installed" != "$ndk_required" ]; then
@@ -72,7 +72,11 @@ fi
 prompt_color=33
 
 toolchain_version=20150406
-sdk_version=20150607
+if [ $host_platform = "android" ]; then
+  sdk_version=20150628
+else
+  sdk_version=20150607
+fi
 
 if [ -n "$FRIDA_ENV_NAME" ]; then
   frida_env_name_prefix=${FRIDA_ENV_NAME}-
@@ -213,11 +217,11 @@ case $host_platform in
         android_host_toolchain=aarch64-linux-android-4.9
         android_host_toolprefix=aarch64-linux-android-
         android_host_cflags=""
-        android_host_ldflags="-fuse-ld=mcld"
+        android_host_ldflags="-fuse-ld=gold"
         ;;
     esac
 
-    android_clang_prefix="$ANDROID_NDK_ROOT/toolchains/llvm-3.5/prebuilt/${android_build_platform}-x86_64"
+    android_clang_prefix="$ANDROID_NDK_ROOT/toolchains/llvm-3.6/prebuilt/${android_build_platform}-x86_64"
     android_gcc_toolchain="$ANDROID_NDK_ROOT/toolchains/${android_host_toolchain}/prebuilt/${android_build_platform}-x86_64"
     android_sysroot="$ANDROID_NDK_ROOT/platforms/android-${android_target_platform}/arch-${android_host_arch}"
     toolflags="--sysroot=$android_sysroot \
