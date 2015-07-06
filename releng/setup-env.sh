@@ -37,7 +37,7 @@ if [ -z "$FRIDA_HOST" ]; then
 fi
 
 if [ $host_platform = "android" ]; then
-  ndk_required=r10d
+  ndk_required=r10e
   if [ -n "$ANDROID_NDK_ROOT" ]; then
     ndk_installed=$(cut -f1 -d" " "$ANDROID_NDK_ROOT/RELEASE.TXT")
     if [ "$ndk_installed" != "$ndk_required" ]; then
@@ -72,7 +72,14 @@ fi
 prompt_color=33
 
 toolchain_version=20150406
-sdk_version=20150423
+case $host_platform in
+  mac|ios|android)
+    sdk_version=20150628
+    ;;
+  *)
+    sdk_version=20150607
+    ;;
+esac
 
 if [ -n "$FRIDA_ENV_NAME" ]; then
   frida_env_name_prefix=${FRIDA_ENV_NAME}-
@@ -148,7 +155,7 @@ case $host_platform in
     ;;
   ios)
     ios_minver="7.0"
-    ios_sdkver="8.3"
+    ios_sdkver="8.4"
 
     ios_sdk="iphoneos$ios_sdkver"
     ios_sdk_path="$(xcrun --sdk $ios_sdk --show-sdk-path)"
@@ -180,42 +187,46 @@ case $host_platform in
     android_host_arch=$(echo ${host_arch} | sed 's,^i386$,x86,')
     case $android_host_arch in
       x86)
+        android_target_platform=14
         android_host_abi=x86
         android_host_target=i686-none-linux-android
         android_host_toolchain=x86-4.8
         android_host_toolprefix=i686-linux-android-
         android_host_cflags="-march=i686"
-        android_host_ldflags=""
+        android_host_ldflags="-fuse-ld=gold"
         ;;
       x86_64)
+        android_target_platform=21
         android_host_abi=x86_64
         android_host_target=x86_64-none-linux-android
         android_host_toolchain=x86_64-4.9
         android_host_toolprefix=x86_64-linux-android-
         android_host_cflags="-march=x86_64"
-        android_host_ldflags=""
+        android_host_ldflags="-fuse-ld=gold"
         ;;
       arm)
+        android_target_platform=14
         android_host_abi=armeabi-v7a
         android_host_target=armv7-none-linux-androideabi
         android_host_toolchain=arm-linux-androideabi-4.8
         android_host_toolprefix=arm-linux-androideabi-
         android_host_cflags="-march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16"
-        android_host_ldflags="-Wl,--fix-cortex-a8"
+        android_host_ldflags="-fuse-ld=gold -Wl,--fix-cortex-a8"
         ;;
       arm64)
+        android_target_platform=21
         android_host_abi=arm64-v8a
         android_host_target=aarch64-none-linux-android
         android_host_toolchain=aarch64-linux-android-4.9
         android_host_toolprefix=aarch64-linux-android-
-        android_host_cflags="-march=arm64"
-        android_host_ldflags=""
+        android_host_cflags=""
+        android_host_ldflags="-fuse-ld=gold"
         ;;
     esac
 
-    android_clang_prefix="$ANDROID_NDK_ROOT/toolchains/llvm-3.4/prebuilt/${android_build_platform}-x86_64"
+    android_clang_prefix="$ANDROID_NDK_ROOT/toolchains/llvm-3.6/prebuilt/${android_build_platform}-x86_64"
     android_gcc_toolchain="$ANDROID_NDK_ROOT/toolchains/${android_host_toolchain}/prebuilt/${android_build_platform}-x86_64"
-    android_sysroot="$ANDROID_NDK_ROOT/platforms/android-14/arch-${android_host_arch}"
+    android_sysroot="$ANDROID_NDK_ROOT/platforms/android-${android_target_platform}/arch-${android_host_arch}"
     toolflags="--sysroot=$android_sysroot \
 --gcc-toolchain=$android_gcc_toolchain \
 --target=$android_host_target \
@@ -281,10 +292,10 @@ case $host_platform in
 
     PATH="$qnx_toolchain_dir:$PATH"
 
-    CPP="$qnx_toolchain_prefix-cpp -march=armv6 --sysroot=$qnx_sysroot $qnx_preprocessor_flags"
-    CC="$qnx_toolchain_prefix-gcc -march=armv6 --sysroot=$qnx_sysroot $qnx_preprocessor_flags -static-libgcc"
-    CXX="$qnx_toolchain_prefix-g++ -march=armv6 --sysroot=$qnx_sysroot $qnx_preprocessor_flags -static-libgcc -static-libstdc++ -std=c++11"
-    LD="$qnx_toolchain_prefix-ld -march=armv6 --sysroot=$qnx_sysroot"
+    CPP="$qnx_toolchain_prefix-cpp -march=armv6 -mno-unaligned-access --sysroot=$qnx_sysroot $qnx_preprocessor_flags"
+    CC="$qnx_toolchain_prefix-gcc -march=armv6 -mno-unaligned-access --sysroot=$qnx_sysroot $qnx_preprocessor_flags -static-libgcc"
+    CXX="$FRIDA_ROOT/releng/qnx-g++-wrapper.sh $qnx_toolchain_prefix-g++ -march=armv6 -mno-unaligned-access --sysroot=$qnx_sysroot $qnx_preprocessor_flags -static-libgcc -static-libstdc++ -std=c++11"
+    LD="$qnx_toolchain_prefix-ld -march=armv6 -mno-unaligned-access --sysroot=$qnx_sysroot"
 
     AR="$qnx_toolchain_prefix-ar"
     NM="$qnx_toolchain_prefix-nm"
@@ -339,7 +350,7 @@ VALAC="$VALAC --vapidir=\"$FRIDA_PREFIX/share/vala/vapi\""
 [ ! -d "$FRIDA_PREFIX/share/aclocal}" ] && mkdir -p "$FRIDA_PREFIX/share/aclocal"
 [ ! -d "$FRIDA_PREFIX/lib}" ] && mkdir -p "$FRIDA_PREFIX/lib"
 
-if [ ! -f "$FRIDA_TOOLROOT/.stamp" ]; then
+if ! grep -Eq "^$toolchain_version\$" "$FRIDA_TOOLROOT/.version" 2>/dev/null; then
   rm -rf "$FRIDA_TOOLROOT"
   mkdir -p "$FRIDA_TOOLROOT"
 
@@ -360,10 +371,10 @@ if [ ! -f "$FRIDA_TOOLROOT/.stamp" ]; then
       "$template" > "$target"
   done
 
-  touch "$FRIDA_TOOLROOT/.stamp"
+  echo $toolchain_version > "$FRIDA_TOOLROOT/.version"
 fi
 
-if [ "$FRIDA_ENV_SDK" != 'none' -a ! -f "$FRIDA_SDKROOT/.stamp" ]; then
+if [ "$FRIDA_ENV_SDK" != 'none' ] && ! grep -Eq "^$sdk_version\$" "$FRIDA_SDKROOT/.version" 2>/dev/null; then
   rm -rf "$FRIDA_SDKROOT"
   mkdir -p "$FRIDA_SDKROOT"
 
@@ -405,7 +416,7 @@ if [ "$FRIDA_ENV_SDK" != 'none' -a ! -f "$FRIDA_SDKROOT/.stamp" ]; then
     fi
   done
 
-  touch "$FRIDA_SDKROOT/.stamp"
+  echo $sdk_version > "$FRIDA_SDKROOT/.version"
 fi
 
 env_rc=build/${FRIDA_ENV_NAME:-frida}-env-${host_platform_arch}.rc

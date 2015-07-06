@@ -38,18 +38,15 @@ ifeq ($(host_platform), ios)
 	iconv := build/fs-%/lib/libiconv.a
 endif
 ifeq ($(host_platform), linux)
-	xz := build/fs-%/lib/pkgconfig/liblzma.pc
 	unwind := build/fs-%/lib/pkgconfig/libunwind.pc
 	bfd := build/fs-%/lib/libbfd.a
 endif
 ifeq ($(host_platform), android)
-	xz := build/fs-%/lib/pkgconfig/liblzma.pc
 	unwind := build/fs-%/lib/pkgconfig/libunwind.pc
 	iconv := build/fs-%/lib/libiconv.a
 	bfd := build/fs-%/lib/libbfd.a
 endif
 ifeq ($(host_platform), qnx)
-	xz := build/fs-%/lib/pkgconfig/liblzma.pc
 	unwind := build/fs-%/lib/pkgconfig/libunwind.pc
 	iconv := build/fs-%/lib/libiconv.a
 	bfd := build/fs-%/lib/libbfd.a
@@ -73,7 +70,7 @@ build/sdk-$(host_platform)-$(host_arch).tar.bz2: build/fs-tmp-$(host_platform_ar
 
 build/fs-tmp-%/.package-stamp: \
 		build/fs-%/lib/libz.a \
-		$(xz) \
+		build/fs-%/lib/pkgconfig/liblzma.pc \
 		$(unwind) \
 		$(iconv) \
 		$(bfd) \
@@ -123,9 +120,17 @@ build/fs-tmp-%/zlib/Makefile: build/fs-env-%.rc build/.zlib-stamp
 				export PATH="$$(dirname $$NM):$$PATH"; \
 				export CHOST="i686-linux-android"; \
 				;; \
+			android-x86_64) \
+				export PATH="$$(dirname $$NM):$$PATH"; \
+				export CHOST="x86_64-linux-android"; \
+				;; \
 			android-arm) \
 				export PATH="$$(dirname $$NM):$$PATH"; \
 				export CHOST="arm-linux-androideabi"; \
+				;; \
+			android-arm64) \
+				export PATH="$$(dirname $$NM):$$PATH"; \
+				export CHOST="aarch64-linux-android"; \
 				;; \
 			qnx-i386) \
 				export PATH="$$(dirname $$NM):$$PATH"; \
@@ -252,7 +257,7 @@ endef
 
 $(eval $(call make-git-module-rules,xz,build/fs-%/lib/pkgconfig/liblzma.pc,))
 
-$(eval $(call make-git-module-rules,libunwind,build/fs-%/lib/pkgconfig/libunwind.pc,$(xz)))
+$(eval $(call make-git-module-rules,libunwind,build/fs-%/lib/pkgconfig/libunwind.pc,build/fs-%/lib/pkgconfig/liblzma.pc))
 
 $(eval $(call make-git-module-rules,libffi,build/fs-%/lib/pkgconfig/libffi.pc,))
 
@@ -265,15 +270,19 @@ $(eval $(call make-git-module-rules,json-glib,build/fs-%/lib/pkgconfig/json-glib
 
 ifeq ($(host_arch), i386)
 	v8_arch := ia32
+	android_target_platform := 14
 endif
 ifeq ($(host_arch), x86_64)
 	v8_arch := x64
+	android_target_platform := 21
 endif
 ifeq ($(host_arch), arm)
 	v8_arch := arm
+	android_target_platform := 14
 endif
 ifeq ($(host_arch), arm64)
 	v8_arch := arm64
+	android_target_platform := 21
 endif
 
 ifeq ($(host_platform), linux)
@@ -286,7 +295,7 @@ ifeq ($(host_platform), qnx)
 endif
 ifeq ($(host_platform), android)
 	v8_flavor_prefix := android_
-	v8_host_flags := -f make-android -D android_ndk_root=$(ANDROID_NDK_ROOT) -D android_sysroot=$(ANDROID_NDK_ROOT) -D android_target_platform=14 -D clang=1
+	v8_host_flags := -f make-android -D android_ndk_root=$(ANDROID_NDK_ROOT) -D android_sysroot=$(ANDROID_NDK_ROOT) -D android_target_platform=$(android_target_platform) -D clang=1
 	v8_libs_private := " -lm"
 endif
 ifeq ($(host_platform), mac)
